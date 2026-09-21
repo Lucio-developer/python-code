@@ -19,9 +19,12 @@ def main():
         page_login()
     elif st.session_state['pagina_atual'] == 'chat':
         if st.session_state['user2'] == '':
-            page_conversas()
+            container = st.container()
+            page_conversas(container)
         else:
             page_chat()
+            container = st.sidebar.container()
+            page_conversas(container)
 
 def inicialização():
     if not 'pagina_atual' in st.session_state:
@@ -77,6 +80,7 @@ def _login_usuario(nome, senha):
         st.rerun()
     else:
         st.error('Erro ao logar')
+        st.rerun()
 
 def validacao_de_senha(nome, senha):
     nome_arquivo = unidecode(nome.replace(' ', '_').lower())
@@ -115,14 +119,17 @@ def page_login():
         nome = st.text_input('Cadastre um novo nome de usuario')
         senha = st.text_input('Cadastre uma nova senha')
         if st.form_submit_button('Cadastrar'):
-            _casdastrar_usuario(nome, senha)
+            if senha == "":
+                st.error("Senha Invalida!")
+            else:
+                _casdastrar_usuario(nome, senha)
 
 def page_chat():
-    st.title('🟢​ Bier Chat...')
+    st.title(f'🟢​ My Chat, {st.session_state['usuario_logado']}')
     st.divider()
 
     user1 = st.session_state['usuario_logado']
-    user2 = 'Mori'
+    user2 = st.session_state['user2']
     mensagens = ler_mensagens_armazenadas(user1, user2)
 
     for mensagem in mensagens:
@@ -140,17 +147,25 @@ def page_chat():
         mensagens.append(nova_dict_mensagem)
         armazena_mensagens(user1, user2, mensagens)
 
-def page_conversas():
-    user2 = st.selectbox('Selecione o usuário para conversar',
-                         lista_usuarios())
-    st.button('Iniciar conversa',
+def page_conversas(elemento):
+    if not st.session_state['user2'] == "":
+        elemento.title(f"Conversando com :green[{st.session_state['user2']}]")
+        elemento.divider()
+    #Comentar para falar comigo mesmo
+    usuarios = lista_usuarios() 
+    usuarios = [i for i in usuarios if i != st.session_state['usuario_logado']]
+    user2 = elemento.selectbox('Selecione o usuário para conversar',
+                                usuarios)
+    #user2 = elemento.selectbox('Selecione o usuário para conversar',
+    #                     lista_usuarios())
+    elemento.button('Iniciar conversa',
               on_click=_sel_conversa,
               args=(user2, ))
 
 def _sel_conversa(user2):
     st.session_state['user2'] = user2
     st.success(f'Iniciando conversa com {user2}')
-    time.sleep(1)
+    time.sleep(2)
     mudar_pagina('chat')
 
 if __name__ == '__main__':
