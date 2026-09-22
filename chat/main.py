@@ -11,6 +11,9 @@ PASTA_MENSAGENS.mkdir(exist_ok=True)
 PASTA_USUARIOS = Path(__file__).parent /'usuarios'
 PASTA_USUARIOS.mkdir(exist_ok=True)
 
+#----------------------------VARIAVEIS-------------------------------#
+TEMPO_RERUN = 3
+
 #------------------------------INICIAL-------------------------------#
 def main():
     inicialização()
@@ -25,6 +28,8 @@ def main():
             page_chat()
             container = st.sidebar.container()
             page_conversas(container)
+            time.sleep(TEMPO_RERUN)
+            st.rerun()
 
 def inicialização():
     if not 'pagina_atual' in st.session_state:
@@ -35,6 +40,9 @@ def inicialização():
 
     if not 'user2' in st.session_state:
         st.session_state['user2'] = ''
+
+    if not 'ultima_mensagem_enviada' in st.session_state:
+        st.session_state['ultima_mensagem_enviada'] = ''
 
 #------------------------------ARQUIVOS------------------------------#
 def ler_mensagens_armazenadas(user1, user2):
@@ -132,20 +140,24 @@ def page_chat():
     user2 = st.session_state['user2']
     mensagens = ler_mensagens_armazenadas(user1, user2)
 
+    container = st.container()
     for mensagem in mensagens:
-        nome_user = 'user' if mensagem['nome_usuario'] == user1 else mensagens
-        avatar = None if mensagem['nome_usuario'] == user1 else '😀'
-        chat = st.chat_message(nome_user, avatar = avatar)
+        nome_user = 'user' if mensagem['nome_usuario'] == user1 else mensagem['nome_usuario']
+        avatar = None if mensagem['nome_usuario'] == user1 else '⚪'
+        chat = container.chat_message(nome_user, avatar = avatar)
         chat.markdown(mensagem['conteudo'])
 
     nova_mensagem = st.chat_input('Digite uma mensagem')
     if nova_mensagem:
-        nova_dict_mensagem = {'nome_usuario': user1,
-                              'conteudo': nova_mensagem}
-        chat = st.chat_message('user')
-        chat.markdown(nova_dict_mensagem['conteudo'])
-        mensagens.append(nova_dict_mensagem)
-        armazena_mensagens(user1, user2, mensagens)
+        if nova_mensagem != st.session_state['ultima_mensagem_enviada']:
+            st.session_state['ultima_mensagem_enviada'] = nova_mensagem
+
+            nova_dict_mensagem = {'nome_usuario': user1,
+                                'conteudo': nova_mensagem}
+            chat = container.chat_message('user')
+            chat.markdown(nova_dict_mensagem['conteudo'])
+            mensagens.append(nova_dict_mensagem)
+            armazena_mensagens(user1, user2, mensagens)
 
 def page_conversas(elemento):
     if not st.session_state['user2'] == "":
