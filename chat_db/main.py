@@ -6,21 +6,19 @@ from auth import register_user, validate_login, get_available_users
 RERUN_INTERVAL = 3
 
 def main():
-    init_db()  # Garante que as tabelas existem ao iniciar
+    init_db()
     initialize_session()
 
     if st.session_state['current_page'] == 'login':
         page_login()
     elif st.session_state['current_page'] == 'chat':
-        if st.session_state['recipient_user'] == '':
-            container = st.container()
-            page_conversations(container)
-        else:
+        # Renderiza a barra lateral primeiro
+        sidebar_container = st.sidebar.container()
+        page_conversations(sidebar_container)
+
+        # Só renderiza o chat se houver um destinatário selecionado
+        if st.session_state['recipient_user'] != '':
             page_chat()
-            container = st.sidebar.container()
-            page_conversations(container)
-            time.sleep(RERUN_INTERVAL)
-            st.rerun()
 
 def initialize_session():
     if 'current_page' not in st.session_state:
@@ -32,6 +30,7 @@ def initialize_session():
     if 'recipient_user' not in st.session_state:
         st.session_state['recipient_user'] = ''
 
+    # Garante que a chave existe para a comparação
     if 'last_sent_message' not in st.session_state:
         st.session_state['last_sent_message'] = ''
 
@@ -72,14 +71,11 @@ def page_login():
             else:
                 st.error(message)
 
-def page_chat():
-    st.title(f'🟢​ My Chat, {st.session_state["logged_user"]}')
-    st.divider()
-
-    user1 = st.session_state['logged_user']
-    user2 = st.session_state['recipient_user']
+# FRAGMENTO DE MENSAGENS: Atualiza isoladamente a cada 3 segundos
+@st.fragment(run_every=3)
+def render_chat_messages(user1, user2):
     messages = db_load_messages(user1, user2)
-
+    
     container = st.container()
     for msg in messages:
         sender_name = 'user' if msg['username'] == user1 else msg['username']
@@ -87,14 +83,34 @@ def page_chat():
         chat = container.chat_message(sender_name, avatar=avatar)
         chat.markdown(msg['content'])
 
-    new_message = st.chat_input('Digite uma mensagem')
-    if new_message:
-        if new_message != st.session_state['last_sent_message']:
-            st.session_state['last_sent_message'] = new_message
+# --------------------------------------------------------------------------
+# PÁGINA DE CHAT
+# --------------------------------------------------------------------------
+def page_chat():
+    st.title(f'🟢 My Chat, {st.session_state["logged_user"]}')
+    st.divider()
 
-            chat = container.chat_message('user')
-            chat.markdown(new_message)
+    user1 = st.session_state['logged_user']
+    user2 = st.session_state['recipient_user']
+
+    # 1. Chama o fragmento que fica recarregando sozinho em segundo plano
+    render_chat_messages(user1, user2)
+
+    # 2. Caixa de texto para envio fora do fragmento (uma única caixa fixa)
+    new_message = st.chat_input('Digite uma mensagem')
+    
+    if new_message:
+        if new_message != st.session_state.get('last_sent_message', ''):
+            st.session_state['last_sent_message'] = new_message
             db_save_message(user1, user2, new_message)
+            st.rerun()
+
+    def send_message_callback():
+        texto = st.session_state.get('chat_input_key', '')
+        if texto.strip():
+            db_save_message(user1, user2, texto)
+            # Limpa o input para não re-enviar nos próximos reruns automáticos
+            st.session_state['chat_input_key'] = ''
 
 def page_conversations(element):
     if st.session_state['recipient_user'] != "":
