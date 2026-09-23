@@ -4,181 +4,187 @@ from pathlib import Path
 import pickle
 import time
 
-#------------------------------PASTAS-------------------------------#
-PASTA_MENSAGENS = Path(__file__).parent /'mensagens'
-PASTA_MENSAGENS.mkdir(exist_ok=True)
+#------------------------------FOLDERS-------------------------------#
+MESSAGES_FOLDER = Path(__file__).parent / 'mensagens'
+MESSAGES_FOLDER.mkdir(exist_ok=True)
 
-PASTA_USUARIOS = Path(__file__).parent /'usuarios'
-PASTA_USUARIOS.mkdir(exist_ok=True)
+USERS_FOLDER = Path(__file__).parent / 'usuarios'
+USERS_FOLDER.mkdir(exist_ok=True)
 
-#----------------------------VARIAVEIS-------------------------------#
-TEMPO_RERUN = 3
+#----------------------------VARIABLES-------------------------------#
+RERUN_INTERVAL = 3
 
-#------------------------------INICIAL-------------------------------#
+#------------------------------INITIAL-------------------------------#
+
 def main():
-    inicialização()
+    initialize_session()
 
-    if st.session_state['pagina_atual'] == 'login':
+    if st.session_state['current_page'] == 'login':
         page_login()
-    elif st.session_state['pagina_atual'] == 'chat':
-        if st.session_state['user2'] == '':
+    elif st.session_state['current_page'] == 'chat':
+        if st.session_state['recipient_user'] == '':
             container = st.container()
-            page_conversas(container)
+            page_conversations(container)
         else:
             page_chat()
             container = st.sidebar.container()
-            page_conversas(container)
-            time.sleep(TEMPO_RERUN)
+            page_conversations(container)
+            time.sleep(RERUN_INTERVAL)
             st.rerun()
 
-def inicialização():
-    if not 'pagina_atual' in st.session_state:
-        mudar_pagina('login')
+def initialize_session():
+    if 'current_page' not in st.session_state:
+        change_page('login')
 
-    if not 'usuario_logado' in st.session_state:
-        st.session_state['usuario_logado'] = ''
+    if 'logged_user' not in st.session_state:
+        st.session_state['logged_user'] = ''
 
-    if not 'user2' in st.session_state:
-        st.session_state['user2'] = ''
+    if 'recipient_user' not in st.session_state:
+        st.session_state['recipient_user'] = ''
 
-    if not 'ultima_mensagem_enviada' in st.session_state:
-        st.session_state['ultima_mensagem_enviada'] = ''
+    if 'last_sent_message' not in st.session_state:
+        st.session_state['last_sent_message'] = ''
 
-#------------------------------ARQUIVOS------------------------------#
-def ler_mensagens_armazenadas(user1, user2):
-    nome_arquivo = nome_arquivo_armazenado(user1, user2)
-    if (PASTA_MENSAGENS / nome_arquivo).exists():
-        with open(PASTA_MENSAGENS / nome_arquivo, 'rb') as f:
+#------------------------------FILES------------------------------#
+def load_stored_messages(user1, user2):
+    file_name = get_storage_file_name(user1, user2)
+    if (MESSAGES_FOLDER / file_name).exists():
+        with open(MESSAGES_FOLDER / file_name, 'rb') as f:
             return pickle.load(f)
     else:
         return []
 
-def armazena_mensagens(user1, user2, mensagens):
-    nome_arquivo = nome_arquivo_armazenado(user1, user2)
-    with open(PASTA_MENSAGENS / nome_arquivo, 'wb') as f:
-        pickle.dump(mensagens, f)
+def save_messages(user1, user2, messages):
+    file_name = get_storage_file_name(user1, user2)
+    with open(MESSAGES_FOLDER / file_name, 'wb') as f:
+        pickle.dump(messages, f)
 
-def nome_arquivo_armazenado(user1, user2):
-    nome_arquivo = [user1, user2]
-    nome_arquivo.sort()
-    nome_arquivo = [i.replace(' ', '_') for i in nome_arquivo]
-    nome_arquivo = [unidecode(i) for i in nome_arquivo]
-    return '&'.join(nome_arquivo).lower()
+def get_storage_file_name(user1, user2):
+    file_name = [user1, user2]
+    file_name.sort()
+    file_name = [i.replace(' ', '_') for i in file_name]
+    file_name = [unidecode(i) for i in file_name]
+    return '&'.join(file_name).lower()
 
-def salvar_novo_usuario(nome, senha):
-    nome_arquivo = unidecode(nome.replace(' ', '_').lower())
-    if (PASTA_USUARIOS / nome_arquivo).exists():
+def save_new_user(username, password):
+    file_name = unidecode(username.replace(' ', '_').lower())
+    if (USERS_FOLDER / file_name).exists():
         return False
     else:
-        with open(PASTA_USUARIOS / nome_arquivo, 'wb') as f:
-            pickle.dump({'nome_usuario' : nome,'senha' : senha}, f)
+        with open(USERS_FOLDER / file_name, 'wb') as f:
+            pickle.dump({'username': username, 'password': password}, f)
         return True
 
-def lista_usuarios():
-    usuarios = list(PASTA_USUARIOS.glob('*'))
-    usuarios = [i.stem.upper() for i in usuarios]
-    return usuarios
+def get_user_list():
+    users = list(USERS_FOLDER.glob('*'))
+    users = [i.stem.upper() for i in users]
+    return users
+
 #----------------------------------LOGIN---------------------------------#
-def _login_usuario(nome, senha):
-    if validacao_de_senha(nome, senha):
+def login_user(username, password):
+    if validate_password(username, password):
         st.success('Login efetuando com sucesso')
         time.sleep(1)
-        st.session_state['usuario_logado'] = nome.upper()
-        mudar_pagina('chat')
+        st.session_state['logged_user'] = username.upper()
+        change_page('chat')
         st.rerun()
     else:
         st.error('Erro ao logar')
         st.rerun()
 
-def validacao_de_senha(nome, senha):
-    nome_arquivo = unidecode(nome.replace(' ', '_').lower())
-    if not (PASTA_USUARIOS / nome_arquivo).exists():
+def validate_password(username, password):
+    file_name = unidecode(username.replace(' ', '_').lower())
+    if not (USERS_FOLDER / file_name).exists():
         return False
     else:
-        with open(PASTA_USUARIOS / nome_arquivo, 'rb') as f:
-            arquivo_senha = pickle.load(f)
-        return arquivo_senha['senha'] == senha 
+        with open(USERS_FOLDER / file_name, 'rb') as f:
+            user_data = pickle.load(f)
+        return user_data['password'] == password 
 
-def _casdastrar_usuario(nome, senha):
-    if salvar_novo_usuario(nome, senha):
+def register_user(username, password):
+    if save_new_user(username, password):
         st.success('Usuario cadastrado com sucesso')
         time.sleep(1)
-        st.session_state['usuario_logado'] = nome.upper()
-        mudar_pagina('chat')
+        st.session_state['logged_user'] = username.upper()
+        change_page('chat')
         st.rerun()
     else:
         st.error('Erro ao cadastrar usuário')
     
-#----------------------------------PAGINAS--------------------------------#     
-def mudar_pagina(nome_pagina):
-    st.session_state['pagina_atual'] = nome_pagina
+#----------------------------------PAGES--------------------------------#     
+def change_page(page_name):
+    st.session_state['current_page'] = page_name
     
 def page_login():
     st.header('🟢​ Sistema de Mensagens Particular', divider=True)
-    tab1, tab2 = st.tabs(['Entrar','Cadastrar'])
+    tab1, tab2 = st.tabs(['Entrar', 'Cadastrar'])
 
     with tab1.form(key='login'):
-        nome = st.text_input('Digite seu nome de usuario')
-        senha = st.text_input('Digite sua senha')
+        username = st.text_input('Digite seu nome de usuario')
+        password = st.text_input('Digite sua senha', type='password')
         if st.form_submit_button('Entrar'):
-            _login_usuario(nome, senha)
+            login_user(username, password)
 
     with tab2.form(key='cadastro'):
-        nome = st.text_input('Cadastre um novo nome de usuario')
-        senha = st.text_input('Cadastre uma nova senha')
+        username = st.text_input('Cadastre um novo nome de usuario')
+        password = st.text_input('Cadastre uma nova senha', type='password')
         if st.form_submit_button('Cadastrar'):
-            if senha == "":
+            if password == "":
                 st.error("Senha Invalida!")
             else:
-                _casdastrar_usuario(nome, senha)
+                register_user(username, password)
 
 def page_chat():
-    st.title(f'🟢​ My Chat, {st.session_state['usuario_logado']}')
+    st.title(f'🟢​ My Chat, {st.session_state["logged_user"]}')
     st.divider()
 
-    user1 = st.session_state['usuario_logado']
-    user2 = st.session_state['user2']
-    mensagens = ler_mensagens_armazenadas(user1, user2)
+    user1 = st.session_state['logged_user']
+    user2 = st.session_state['recipient_user']
+    messages = load_stored_messages(user1, user2)
 
     container = st.container()
-    for mensagem in mensagens:
-        nome_user = 'user' if mensagem['nome_usuario'] == user1 else mensagem['nome_usuario']
-        avatar = None if mensagem['nome_usuario'] == user1 else '⚪'
-        chat = container.chat_message(nome_user, avatar = avatar)
-        chat.markdown(mensagem['conteudo'])
+    for msg in messages:
+        sender_name = 'user' if msg['username'] == user1 else msg['username']
+        avatar = None if msg['username'] == user1 else '⚪'
+        chat = container.chat_message(sender_name, avatar=avatar)
+        chat.markdown(msg['content'])
 
-    nova_mensagem = st.chat_input('Digite uma mensagem')
-    if nova_mensagem:
-        if nova_mensagem != st.session_state['ultima_mensagem_enviada']:
-            st.session_state['ultima_mensagem_enviada'] = nova_mensagem
+    new_message = st.chat_input('Digite uma mensagem')
+    if new_message:
+        if new_message != st.session_state['last_sent_message']:
+            st.session_state['last_sent_message'] = new_message
 
-            nova_dict_mensagem = {'nome_usuario': user1,
-                                'conteudo': nova_mensagem}
+            message_dict = {
+                'username': user1,
+                'content': new_message
+            }
             chat = container.chat_message('user')
-            chat.markdown(nova_dict_mensagem['conteudo'])
-            mensagens.append(nova_dict_mensagem)
-            armazena_mensagens(user1, user2, mensagens)
+            chat.markdown(message_dict['content'])
+            messages.append(message_dict)
+            save_messages(user1, user2, messages)
 
-def page_conversas(elemento):
-    if not st.session_state['user2'] == "":
-        elemento.title(f"Conversando com :green[{st.session_state['user2']}]")
-        elemento.divider()
-    #Comentar para falar comigo mesmo
-    usuarios = lista_usuarios() 
-    usuarios = [i for i in usuarios if i != st.session_state['usuario_logado']]
-    user2 = elemento.selectbox('Selecione o usuário para conversar',
-                                usuarios)
-    #user2 = elemento.selectbox('Selecione o usuário para conversar',
-    #                     lista_usuarios())
-    elemento.button('Iniciar conversa',
-              on_click=_sel_conversa,
-              args=(user2, ))
+def page_conversations(element):
+    if st.session_state['recipient_user'] != "":
+        element.title(f"Conversando com :green[{st.session_state['recipient_user']}]")
+        element.divider()
+    
+    # Comentar para falar comigo mesmo
+    users = get_user_list() 
+    users = [i for i in users if i != st.session_state['logged_user']]
+    recipient_user = element.selectbox('Selecione o usuário para conversar', users)
+    
+    # recipient_user = element.selectbox('Selecione o usuário para conversar', get_user_list())
+    element.button(
+        'Iniciar conversa',
+        on_click=select_conversation,
+        args=(recipient_user, )
+    )
 
-def _sel_conversa(user2):
-    st.session_state['user2'] = user2
-    st.success(f'Iniciando conversa com {user2}')
+def select_conversation(recipient_user):
+    st.session_state['recipient_user'] = recipient_user
+    st.success(f'Iniciando conversa com {recipient_user}')
     time.sleep(2)
-    mudar_pagina('chat')
+    change_page('chat')
 
 if __name__ == '__main__':
     main()
