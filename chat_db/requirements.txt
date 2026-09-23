@@ -1,6 +1,3 @@
 streamlit
-unidecode
-pathlib
 sqlite3
-time
 auth 
